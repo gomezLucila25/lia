@@ -137,6 +137,35 @@
     }
     @keyframes pulse { 0%,100%{opacity:.25;transform:scale(.8)} 50%{opacity:1;transform:scale(1.15)} }
 
+    /* Banner de aviso de vencimientos */
+    .aviso {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      margin-top: 20px;
+      background: var(--ambar-bg);
+      border: 1px solid #e6d6ad;
+      border-left: 4px solid var(--ambar);
+      border-radius: 12px;
+      padding: 14px 18px;
+    }
+    .aviso.show { display: flex; }
+    #aviso-texto {
+      color: #7a5312;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    #aviso-cerrar {
+      border: none;
+      background: transparent;
+      color: #7a5312;
+      font-size: 1.3rem;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0 4px;
+    }
+
     /* Estado de error */
     .error-box {
       margin-top: 24px;
@@ -544,6 +573,11 @@
       <span id="status" class="status" aria-live="polite"></span>
     </div>
 
+    <div id="aviso" class="aviso" role="alert">
+      <span id="aviso-texto"></span>
+      <button id="aviso-cerrar" aria-label="Cerrar">×</button>
+    </div>
+
     <div id="error-box" class="error-box">
       <p id="error-msg"></p>
       <button id="btn-reintentar">Reintentar</button>
@@ -564,6 +598,8 @@
     const errorMsg = document.getElementById("error-msg");
     const btnReintentar = document.getElementById("btn-reintentar");
     const resultado = document.getElementById("resultado");
+    const aviso = document.getElementById("aviso");
+    const avisoTexto = document.getElementById("aviso-texto");
 
     // --- Lógica de fechas (espeja parser.dias_restantes en Python) ---
     function diasRestantes(fechaIso) {
@@ -865,6 +901,64 @@
         rechazosHtml;
     }
 
+    // ---------- Avisos de vencimiento (notificaciones) ----------
+    function notificarEscritorio(urgentes) {
+      if (!("Notification" in window)) return;
+      const disparar = () => {
+        urgentes.forEach((r) => {
+          const key = `notif:${r.id}:${r.proxima}`;
+          if (localStorage.getItem(key)) return; // ya avisado este ciclo
+          const d = diasRestantes(r.proxima);
+          const cuando = d < 0 ? "ya venció" : d === 0 ? "vence hoy" : "vence mañana";
+          new Notification("LIA · vencimiento", {
+            body: `${r.concepto} ${cuando}${r.monto ? " · " + r.monto : ""}`,
+          });
+          localStorage.setItem(key, "1");
+        });
+      };
+      if (Notification.permission === "granted") disparar();
+      else if (Notification.permission !== "denied")
+        Notification.requestPermission().then((p) => p === "granted" && disparar());
+    }
+
+    function actualizarAviso(items) {
+      const pend = (items || []).filter((r) => !r.pagado);
+      const vencidos = [], hoy = [], manana = [];
+      pend.forEach((r) => {
+        const d = diasRestantes(r.proxima);
+        if (d === null) return;
+        if (d < 0) vencidos.push(r);
+        else if (d === 0) hoy.push(r);
+        else if (d === 1) manana.push(r);
+      });
+      const urgentes = [...vencidos, ...hoy, ...manana];
+      if (!urgentes.length) {
+        aviso.classList.remove("show");
+        return;
+      }
+      const partes = [];
+      if (hoy.length) partes.push(`Hoy: ${hoy.map((r) => r.concepto).join(", ")}`);
+      if (manana.length) partes.push(`Mañana: ${manana.map((r) => r.concepto).join(", ")}`);
+      if (vencidos.length) partes.push(`Vencido: ${vencidos.map((r) => r.concepto).join(", ")}`);
+      avisoTexto.textContent = "🔔 " + partes.join("  ·  ");
+      aviso.classList.add("show");
+      notificarEscritorio(urgentes);
+    }
+
+    async function chequearVencimientos() {
+      try {
+        const resp = await fetch("/api/recordatorios");
+        if (!resp.ok) return;
+        const data = await resp.json();
+        actualizarAviso(data.recordatorios || []);
+      } catch {}
+    }
+
+    aviso.querySelector("#aviso-cerrar").addEventListener("click", () =>
+      aviso.classList.remove("show")
+    );
+    avisoTexto.addEventListener("click", cargarRecordatorios);
+
     // ---------- Recordatorios fijos ----------
     let ultimosRecordatorios = { recordatorios: [] };
     let editandoId = null;
@@ -956,6 +1050,7 @@
     function renderRecordatorios(data) {
       ultimosRecordatorios = data;
       const items = data.recordatorios || [];
+      actualizarAviso(items);
       const lista = items.length
         ? items.map((r) => (r.id === editandoId ? cardEditar(r) : cardRecordatorio(r))).join("")
         : `<p class="vacio">Todavía no cargaste recordatorios. Agregá el primero arriba 👆</p>`;
@@ -1370,6 +1465,9 @@
     );
     btnRecordatorios.addEventListener("click", cargarRecordatorios);
     btnReintentar.addEventListener("click", () => ultimaAccion && ultimaAccion());
+
+    // Al abrir: chequear si hay algo por vencer y avisar.
+    chequearVencimientos();
   </script>
 </body>
 </html>

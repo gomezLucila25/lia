@@ -134,6 +134,14 @@ probar la interfaz sin gastar ni loguearse:
 - **Historial de pagos** (`GET /api/recordatorios/{id}/historial`): mes a mes, qué se pagó
   y con qué comprobante. Botón "🗂 historial" en cada recordatorio.
 
+### 4. Avisos de vencimiento (notificaciones)
+- Al abrir la página, si hay recordatorios que **vencen hoy/mañana o ya vencieron**
+  (y no están pagados), aparece un **banner** arriba ("🔔 Hoy: Luz · Mañana: Alquiler").
+- Además dispara **notificaciones de escritorio** del navegador (si la persona da permiso),
+  una por recordatorio por ciclo (evita repetir con `localStorage`).
+- Se basa en los recordatorios (locales, instantáneos); no requiere Gmail ni IA.
+- El banner se actualiza al marcar pagado / editar / borrar.
+
 ### Robustez
 - `parse_json_safe`: repara JSON truncado (por si la IA se corta). Si no hay nada
   rescatable, la UI muestra "la respuesta vino incompleta, reintentá" (nunca un stack trace).
@@ -155,7 +163,8 @@ Ideas charladas, ordenadas por impacto. **Ninguna está hecha todavía** salvo l
 **Media**
 - [x] **Historial de pagos** por recordatorio (mes a mes, con su comprobante) — HECHO.
 - [x] **Editar** un recordatorio — HECHO (botón ✏️, edición inline, conserva historial).
-- [ ] **Notificaciones/alertas** (mail o del navegador) cuando algo vence pronto.
+- [x] **Notificaciones/alertas** cuando algo vence pronto — HECHO (banner + notificación
+      de escritorio, basado en recordatorios). Futuro: extenderlo a vencimientos del correo.
 - [ ] **Categorías/etiquetas** y filtros en las tres vistas.
 - [ ] **Agregar postulaciones a mano** (por si la IA no detecta alguna).
 
