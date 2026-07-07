@@ -92,6 +92,12 @@ probar la interfaz sin gastar ni loguearse:
 
 ## Funcionalidades actuales
 
+### 0. Resumen  ·  `POST /api/resumen`
+- Pantallazo combinado de "esta semana": junta vencimientos del correo + recordatorios
+  fijos + próximas entrevistas + pendientes de laburo en una sola vista (hero con tiles
+  + timeline "Lo que se viene" ordenada por lo más cercano).
+- Corre triage + búsqueda laboral + recordatorios en una sola llamada (tarda unos segundos).
+
 ### 1. Analizar mis mails (triage)  ·  `POST /api/analizar`
 - Busca inbox 7d (hasta 40) + vencimientos 30d (hasta 20). Solo metadata + snippet.
 - La IA clasifica en: **vencimientos** (con estado pendiente/débito automático/pagado),
@@ -133,8 +139,7 @@ Ideas charladas, ordenadas por impacto. **Ninguna está hecha todavía** salvo l
 "recordatorios dentro de vencimientos" (ya está).
 
 **Próximo / alto impacto**
-- [ ] **Resumen arriba de todo** al abrir: "Esta semana: 3 vencimientos, pagás la luz
-      el jueves, 1 entrevista el miércoles". Un pantallazo de un vistazo.
+- [x] **Resumen arriba de todo** — HECHO (botón "Resumen", `/api/resumen`).
 - [ ] **Marcar recordatorio como "pagado este mes"** (y que el chip cambie a verde),
       idealmente al subir el comprobante.
 - [ ] **Follow-up sugerido** en búsqueda laboral: para postulaciones sin respuesta hace

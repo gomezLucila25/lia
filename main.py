@@ -10,12 +10,13 @@ Corré con:  uvicorn main:app --reload
 """
 
 import os
+from datetime import date
 
 from fastapi import FastAPI, UploadFile, File, Body
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
-from parser import RespuestaIncompletaError
+from parser import RespuestaIncompletaError, dias_restantes
 from gmail_client import obtener_mails, obtener_mails_busqueda, GmailAuthError
 import claude_client
 import gemini_client
@@ -182,6 +183,93 @@ def busqueda():
     return _responder(
         obtener_mails_busqueda, _backend().analizar_busqueda_laboral, DEMO_BUSQUEDA
     )
+
+
+# ---------------- Resumen (pantallazo de todo junto) ----------------
+
+DEMO_RESUMEN = {
+    "vencimientos_semana": [
+        {"titulo": "Resumen Visa Galicia", "fecha": "2026-07-07", "dias": 0, "origen": "mail"},
+        {"titulo": "ABL 3ra cuota", "fecha": "2026-07-08", "dias": 1, "origen": "mail"},
+        {"titulo": "Alquiler", "fecha": "2026-07-09", "dias": 2, "origen": "recordatorio"},
+    ],
+    "entrevistas": [
+        {"titulo": "UX Writer Sr — Mercado Libre", "fecha": "2026-07-09", "dias": 2},
+    ],
+    "pendientes_count": 2,
+    "totales": {"vencimientos": 8, "entrevistas": 1},
+}
+
+
+def _armar_resumen(triage, jobs, recs, hoy):
+    """Combina vencimientos del correo + recordatorios + postulaciones en un
+    pantallazo de 'esta semana'."""
+    venc = []
+    for v in triage.get("vencimientos") or []:
+        if v.get("estado") == "pagado":
+            continue
+        venc.append({
+            "titulo": v.get("titulo"),
+            "fecha": v.get("fecha"),
+            "dias": dias_restantes(v.get("fecha"), hoy),
+            "origen": "mail",
+        })
+    for r in recs:
+        venc.append({
+            "titulo": r.get("concepto"),
+            "fecha": r.get("proxima"),
+            "dias": dias_restantes(r.get("proxima"), hoy),
+            "origen": "recordatorio",
+        })
+    # "Esta semana" = próximos 7 días (incluye lo ya vencido, dias < 0).
+    semana = sorted(
+        [x for x in venc if x["dias"] is not None and x["dias"] <= 7],
+        key=lambda x: x["dias"],
+    )
+
+    entrevistas = []
+    for p in jobs.get("postulaciones") or []:
+        if p.get("estado") == "rechazada":
+            continue
+        if p.get("proxima_fecha") or p.get("estado") == "entrevista_agendada":
+            entrevistas.append({
+                "titulo": f"{p.get('puesto')} — {p.get('empresa')}",
+                "fecha": p.get("proxima_fecha"),
+                "dias": dias_restantes(p.get("proxima_fecha"), hoy),
+            })
+    entrevistas.sort(key=lambda x: (x["dias"] is None, x["dias"] or 0))
+
+    pendientes = [p for p in (jobs.get("postulaciones") or []) if (p.get("pendiente") or "").strip()]
+
+    return {
+        "vencimientos_semana": semana,
+        "entrevistas": entrevistas,
+        "pendientes_count": len(pendientes),
+        "totales": {"vencimientos": len(venc), "entrevistas": len(entrevistas)},
+    }
+
+
+@app.post("/api/resumen")
+def resumen():
+    """Pantallazo combinado: vencimientos (correo + recordatorios) + búsqueda laboral."""
+    try:
+        if _modo_demo():
+            return JSONResponse(DEMO_RESUMEN)
+        backend = _backend()
+        triage = backend.analizar_mails(obtener_mails())
+        jobs = backend.analizar_busqueda_laboral(obtener_mails_busqueda())
+        recs = recordatorios.listar()
+        return JSONResponse(_armar_resumen(triage, jobs, recs, date.today()))
+    except GmailAuthError as e:
+        return JSONResponse({"error": f"Problema de acceso a Gmail: {e}"}, status_code=502)
+    except (ClaudeConfigError, GeminiConfigError) as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+    except RespuestaIncompletaError:
+        return JSONResponse({"error": "La respuesta vino incompleta, reintentá."}, status_code=502)
+    except Exception as e:
+        return JSONResponse(
+            {"error": f"Algo salió mal, reintentá. ({type(e).__name__})"}, status_code=500
+        )
 
 
 # ---------------- Recordatorios fijos (local, sin correo ni IA) ----------------

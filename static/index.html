@@ -161,6 +161,60 @@
     }
     .error-box button:hover { background: var(--rojo); color: #fff; }
 
+    /* Resumen (hero) */
+    section.hero {
+      margin-top: 26px;
+      background:
+        radial-gradient(140% 120% at 0% 0%, #e7efe9 0%, transparent 55%),
+        var(--card);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 24px 26px;
+      box-shadow: var(--shadow);
+    }
+    .hero-titular {
+      font-family: "Fraunces", serif;
+      font-weight: 600;
+      font-size: clamp(1.25rem, 3.5vw, 1.7rem);
+      letter-spacing: -.01em;
+      margin-bottom: 18px;
+    }
+    .tiles { display: flex; gap: 14px; flex-wrap: wrap; }
+    .tile {
+      flex: 1;
+      min-width: 120px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .tile .num {
+      font-family: "Fraunces", serif;
+      font-weight: 900;
+      font-size: 2.1rem;
+      line-height: 1;
+      color: var(--brand);
+    }
+    .tile .lbl {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: .68rem;
+      color: var(--ink-soft);
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      line-height: 1.3;
+    }
+    .card.evento {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .card.evento .ev-info { display: flex; align-items: center; gap: 10px; }
+    .card.evento .ev-ico { font-size: 1.15rem; }
+
     /* Secciones */
     section.bloque { margin-top: 44px; }
     section.bloque.hidden { display: none; }
@@ -399,7 +453,8 @@
     </header>
 
     <div class="actions">
-      <button id="btn-analizar" class="cta">Analizar mis mails</button>
+      <button id="btn-resumen" class="cta">📋 Resumen</button>
+      <button id="btn-analizar" class="cta secundario">Analizar mis mails</button>
       <button id="btn-busqueda" class="cta secundario">Búsqueda laboral</button>
       <button id="btn-recordatorios" class="cta secundario">Recordatorios</button>
       <span id="status" class="status" aria-live="polite"></span>
@@ -416,6 +471,7 @@
   </div>
 
   <script>
+    const btnResumen = document.getElementById("btn-resumen");
     const btn = document.getElementById("btn-analizar");
     const btnBusqueda = document.getElementById("btn-busqueda");
     const btnRecordatorios = document.getElementById("btn-recordatorios");
@@ -565,6 +621,68 @@
         bloque("Requiere acción", `${accion.length}`, accionHtml) +
         bloque("Informativo", `${info.length}`, infoHtml) +
         ruidoHtml;
+    }
+
+    // ---------- Resumen ----------
+    function cuandoTexto(fecha) {
+      const d = diasRestantes(fecha);
+      if (d === null) return "sin fecha";
+      if (d < 0) return `hace ${Math.abs(d)} días`;
+      if (d === 0) return "hoy";
+      if (d === 1) return "mañana";
+      if (d <= 6) {
+        const nombres = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+        const [y, m, dd] = String(fecha).split("-").map(Number);
+        return "el " + nombres[new Date(y, m - 1, dd).getDay()];
+      }
+      return `en ${d} días`;
+    }
+
+    function cardResumenItem(e) {
+      const icono = e.tipo === "entrevista" ? "💼" : e.origen === "recordatorio" ? "🔁" : "💸";
+      const clase = e.dias <= 1 ? "rojo" : e.dias <= 5 ? "ambar" : "neutro";
+      return `
+        <article class="card evento">
+          <div class="ev-info"><span class="ev-ico">${icono}</span><span>${esc(e.titulo)}</span></div>
+          <span class="chip ${clase}">${esc(cuandoTexto(e.fecha))}</span>
+        </article>`;
+    }
+
+    function renderResumen(data) {
+      const venc = data.vencimientos_semana || [];
+      const ents = data.entrevistas || [];
+      const pend = data.pendientes_count || 0;
+
+      const partes = [];
+      if (venc.length) partes.push(`${venc.length} ${venc.length === 1 ? "vencimiento" : "vencimientos"}`);
+      if (ents.length) partes.push(`${ents.length} ${ents.length === 1 ? "entrevista" : "entrevistas"}`);
+      if (pend) partes.push(`${pend} ${pend === 1 ? "pendiente" : "pendientes"} de laburo`);
+      const titular = partes.length
+        ? "Esta semana: " + partes.join(" · ")
+        : "Semana tranquila, nada urgente 🌿";
+
+      const eventos = [
+        ...venc.map((v) => ({ tipo: "pago", titulo: v.titulo, fecha: v.fecha, dias: v.dias, origen: v.origen })),
+        ...ents.map((e) => ({ tipo: "entrevista", titulo: e.titulo, fecha: e.fecha, dias: e.dias })),
+      ]
+        .filter((e) => e.dias !== null)
+        .sort((a, b) => a.dias - b.dias);
+
+      const filas = eventos.length
+        ? eventos.map(cardResumenItem).join("")
+        : `<p class="vacio">Nada agendado para los próximos días.</p>`;
+
+      const hero = `
+        <section class="hero">
+          <div class="hero-titular">${esc(titular)}</div>
+          <div class="tiles">
+            <div class="tile"><span class="num">${venc.length}</span><span class="lbl">vencimientos<br>esta semana</span></div>
+            <div class="tile"><span class="num">${ents.length}</span><span class="lbl">entrevistas<br>próximas</span></div>
+            <div class="tile"><span class="num">${pend}</span><span class="lbl">pendientes<br>de laburo</span></div>
+          </div>
+        </section>`;
+
+      resultado.innerHTML = hero + bloque("Lo que se viene", "ordenado por lo más cercano", filas);
     }
 
     // ---------- Modo búsqueda laboral ----------
@@ -896,6 +1014,7 @@
 
     // ---------- Motor común ----------
     function setCargando(cargando, etiqueta) {
+      btnResumen.disabled = cargando;
       btn.disabled = cargando;
       btnBusqueda.disabled = cargando;
       btnRecordatorios.disabled = cargando;
@@ -930,6 +1049,9 @@
       }
     }
 
+    btnResumen.addEventListener("click", () =>
+      correr("/api/resumen", renderResumen, "Armando tu resumen…")
+    );
     btn.addEventListener("click", () =>
       correr("/api/analizar", render, "Leyendo Gmail y pensando…")
     );
