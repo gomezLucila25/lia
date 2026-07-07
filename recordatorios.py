@@ -173,6 +173,30 @@ def agregar(concepto, dia, monto=""):
     return listar()
 
 
+def editar(rid, concepto, dia, monto=""):
+    """Edita concepto/día/monto de un recordatorio, conservando su historial de
+    pagos. Devuelve la lista actualizada."""
+    concepto = (concepto or "").strip()
+    if not concepto:
+        raise RecordatorioInvalido("Poné un concepto (ej: Alquiler, Luz).")
+    try:
+        dia = int(dia)
+    except (TypeError, ValueError):
+        raise RecordatorioInvalido("El día tiene que ser un número del 1 al 31.")
+    if not 1 <= dia <= 31:
+        raise RecordatorioInvalido("El día tiene que estar entre 1 y 31.")
+
+    items = _leer()
+    for it in items:
+        if it.get("id") == int(rid):
+            it["concepto"] = concepto
+            it["dia"] = dia
+            it["monto"] = str(monto or "").strip()
+            break
+    _guardar(items)
+    return listar()
+
+
 def borrar(rid):
     """Borra el recordatorio con ese id y devuelve la lista actualizada."""
     try:

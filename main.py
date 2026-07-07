@@ -330,6 +330,15 @@ def add_recordatorio(r: RecordatorioIn):
         return JSONResponse({"error": str(e)}, status_code=400)
 
 
+@app.put("/api/recordatorios/{rid}")
+def editar_recordatorio(rid: int, r: RecordatorioIn):
+    """Edita un recordatorio (concepto/día/monto), conservando su historial."""
+    try:
+        return JSONResponse({"recordatorios": recordatorios.editar(rid, r.concepto, r.dia, r.monto)})
+    except RecordatorioInvalido as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+
 @app.delete("/api/recordatorios/{rid}")
 def del_recordatorio(rid: int):
     return JSONResponse({"recordatorios": recordatorios.borrar(rid)})

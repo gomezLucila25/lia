@@ -121,6 +121,8 @@ probar la interfaz sin gastar ni loguearse:
 - Gastos recurrentes cargados a mano (alquiler, agua, luz, gas, ADT, expensas, etc.):
   concepto + día del mes + monto opcional.
 - Se guardan en `recordatorios.json` (disco local; sobreviven cierre de página y apagado).
+- **Editar** (`PUT /api/recordatorios/{id}`): botón ✏️ en cada recordatorio; edición inline
+  de concepto/día/monto conservando el historial de pagos.
 - Chips de "vence en X días". No usan Gmail ni IA → gratis.
 - **Marcar como pagado** por mes (`POST /api/recordatorios/{id}/pagado`): chip verde "pagado ✓";
   se resetea solo el mes siguiente. Subir un comprobante marca pagado automáticamente.
@@ -152,7 +154,7 @@ Ideas charladas, ordenadas por impacto. **Ninguna está hecha todavía** salvo l
 
 **Media**
 - [x] **Historial de pagos** por recordatorio (mes a mes, con su comprobante) — HECHO.
-- [ ] **Editar** un recordatorio (hoy solo se agrega/borra).
+- [x] **Editar** un recordatorio — HECHO (botón ✏️, edición inline, conserva historial).
 - [ ] **Notificaciones/alertas** (mail o del navegador) cuando algo vence pronto.
 - [ ] **Categorías/etiquetas** y filtros en las tres vistas.
 - [ ] **Agregar postulaciones a mano** (por si la IA no detecta alguna).

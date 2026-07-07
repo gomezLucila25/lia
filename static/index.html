@@ -470,7 +470,7 @@
       cursor: pointer;
     }
     button.mini:hover { border-color: var(--brand); color: var(--brand); }
-    button.borrar {
+    button.borrar, button.editar {
       border: none;
       background: transparent;
       color: var(--ink-soft);
@@ -481,6 +481,7 @@
       border-radius: 8px;
     }
     button.borrar:hover { background: var(--rojo-bg); color: var(--rojo); }
+    button.editar:hover { background: var(--azul-bg); }
 
     button.toggle-pago {
       border: 1px solid var(--line);
@@ -865,6 +866,9 @@
     }
 
     // ---------- Recordatorios fijos ----------
+    let ultimosRecordatorios = { recordatorios: [] };
+    let editandoId = null;
+
     function chipRecordatorio(r) {
       if (r.pagado) return { texto: "pagado ✓", clase: "verde" };
       const d = diasRestantes(r.proxima);
@@ -911,10 +915,24 @@
             <div class="right">
               <span class="chip ${chip.clase}">${esc(chip.texto)}</span>
               ${toggle}
+              <button class="editar" data-id="${esc(r.id)}" title="Editar" aria-label="Editar">✏️</button>
               <button class="borrar" data-id="${esc(r.id)}" title="Borrar" aria-label="Borrar">✕</button>
             </div>
           </div>
           ${comprobantesHtml(r)}
+        </article>`;
+    }
+
+    function cardEditar(r) {
+      return `
+        <article class="card recordatorio">
+          <form class="form-rec" data-edit="1" data-id="${esc(r.id)}">
+            <input class="concepto" name="concepto" value="${esc(r.concepto)}" list="conceptos" required />
+            <input class="dia" type="number" name="dia" min="1" max="31" value="${esc(r.dia)}" required />
+            <input class="monto" name="monto" value="${esc(r.monto)}" placeholder="Monto (opcional)" />
+            <button type="submit" class="cta">Guardar</button>
+            <button type="button" class="mini cancelar-edit">Cancelar</button>
+          </form>
         </article>`;
     }
 
@@ -936,9 +954,10 @@
     }
 
     function renderRecordatorios(data) {
+      ultimosRecordatorios = data;
       const items = data.recordatorios || [];
       const lista = items.length
-        ? items.map(cardRecordatorio).join("")
+        ? items.map((r) => (r.id === editandoId ? cardEditar(r) : cardRecordatorio(r))).join("")
         : `<p class="vacio">Todavía no cargaste recordatorios. Agregá el primero arriba 👆</p>`;
       const toolbar = `
         <div class="rec-toolbar">
@@ -953,6 +972,32 @@
       );
       const form = document.getElementById("form-rec");
       if (form) form.addEventListener("submit", onAgregarRecordatorio);
+      resultado
+        .querySelectorAll("form[data-edit]")
+        .forEach((f) => f.addEventListener("submit", onEditarRecordatorio));
+    }
+
+    async function onEditarRecordatorio(e) {
+      e.preventDefault();
+      const f = e.target;
+      errorBox.classList.remove("show");
+      try {
+        const resp = await fetch(`/api/recordatorios/${f.dataset.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            concepto: f.concepto.value.trim(),
+            dia: Number(f.dia.value),
+            monto: f.monto.value.trim(),
+          }),
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || data.error) throw new Error(data.error || `Error ${resp.status}`);
+        editandoId = null;
+        renderRecordatorios(data);
+      } catch (err) {
+        mostrarError(err.message || "No pude guardar los cambios.");
+      }
     }
 
     async function cargarRecordatorios() {
@@ -1212,6 +1257,20 @@
       if (del) {
         e.preventDefault();
         borrarRecordatorio(del.dataset.id);
+        return;
+      }
+      const ed = e.target.closest("button.editar");
+      if (ed) {
+        e.preventDefault();
+        editandoId = Number(ed.dataset.id);
+        renderRecordatorios(ultimosRecordatorios);
+        return;
+      }
+      const ce = e.target.closest("button.cancelar-edit");
+      if (ce) {
+        e.preventDefault();
+        editandoId = null;
+        renderRecordatorios(ultimosRecordatorios);
         return;
       }
       const delc = e.target.closest("button.borrar-comp");
