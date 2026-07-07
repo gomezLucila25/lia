@@ -66,11 +66,40 @@ def listar(hoy=None):
     for it in items:
         prox = proxima_fecha(it.get("dia", 1), hoy)
         it["proxima"] = prox
+        it["mes"] = prox[:7]
         # Pagado si el mes de la próxima fecha (YYYY-MM) está en la lista de pagos.
         it["pagado"] = prox[:7] in (it.get("pagos") or [])
-        it["comprobantes"] = comprobantes.listar(it.get("id", 0))
+        it["comprobantes"] = comprobantes.listar(it.get("id", 0), prox[:7])
     items.sort(key=lambda it: it["proxima"])
     return items
+
+
+def mes_actual(rid, hoy=None):
+    """Mes (YYYY-MM) del ciclo vigente de un recordatorio."""
+    for it in _leer():
+        if it.get("id") == int(rid):
+            return proxima_fecha(it.get("dia", 1), hoy)[:7]
+    return proxima_fecha(1, hoy)[:7]
+
+
+def historial(rid):
+    """Historial mes a mes de un recordatorio: qué meses se pagaron y con qué
+    comprobantes."""
+    rid = int(rid)
+    it = next((x for x in _leer() if x.get("id") == rid), None)
+    if not it:
+        return {"id": rid, "concepto": "", "meses": []}
+    pagos = set(it.get("pagos") or [])
+    comps = comprobantes.historial(rid)
+    meses = sorted(pagos | set(comps.keys()), reverse=True)
+    return {
+        "id": rid,
+        "concepto": it.get("concepto", ""),
+        "meses": [
+            {"mes": m, "pagado": m in pagos, "comprobantes": comps.get(m, [])}
+            for m in meses
+        ],
+    }
 
 
 def marcar_pagado(rid, pagado=True, hoy=None):

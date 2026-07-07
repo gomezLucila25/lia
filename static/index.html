@@ -387,6 +387,17 @@
       padding: 5px 10px;
     }
     label.subir:hover { background: var(--azul-bg); }
+    button.ver-historial {
+      border: none;
+      background: transparent;
+      color: var(--ink-soft);
+      cursor: pointer;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: .72rem;
+      padding: 5px 8px;
+      border-radius: 8px;
+    }
+    button.ver-historial:hover { color: var(--brand); text-decoration: underline; }
 
     .rec-toolbar { display: flex; gap: 8px; margin-bottom: 16px; }
     button.mini {
@@ -791,8 +802,8 @@
         .map(
           (n) => `
           <span class="comp">
-            <a href="/api/recordatorios/${r.id}/comprobantes/${encodeURIComponent(n)}" target="_blank" rel="noopener">📄 ${esc(n)}</a>
-            <button class="borrar-comp" data-id="${esc(r.id)}" data-nombre="${esc(n)}" title="Quitar">✕</button>
+            <a href="/api/recordatorios/${r.id}/comprobantes/${encodeURIComponent(r.mes)}/${encodeURIComponent(n)}" target="_blank" rel="noopener">📄 ${esc(n)}</a>
+            <button class="borrar-comp" data-id="${esc(r.id)}" data-mes="${esc(r.mes)}" data-nombre="${esc(n)}" title="Quitar">✕</button>
           </span>`
         )
         .join("");
@@ -802,6 +813,7 @@
           <label class="subir">📎 subir comprobante
             <input class="comp-input" type="file" data-id="${esc(r.id)}" hidden />
           </label>
+          <button class="ver-historial" data-id="${esc(r.id)}">🗂 historial</button>
         </div>`;
     }
 
@@ -994,16 +1006,74 @@
       }
     }
 
-    async function borrarComprobante(id, nombre) {
+    async function borrarComprobante(id, mes, nombre) {
       try {
         const resp = await fetch(
-          `/api/recordatorios/${id}/comprobantes/${encodeURIComponent(nombre)}`,
+          `/api/recordatorios/${id}/comprobantes/${encodeURIComponent(mes)}/${encodeURIComponent(nombre)}`,
           { method: "DELETE" }
         );
         if (!resp.ok) throw new Error(`Error ${resp.status}`);
         await cargarRecordatorios();
       } catch (err) {
         mostrarError("No pude borrar el comprobante.");
+      }
+    }
+
+    function nombreMes(mes) {
+      const [y, m] = String(mes).split("-").map(Number);
+      const nombres = ["", "enero", "febrero", "marzo", "abril", "mayo", "junio",
+        "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+      return `${nombres[m] || mes} ${y || ""}`.trim();
+    }
+
+    function renderHistorial(data) {
+      const meses = data.meses || [];
+      const filas = meses.length
+        ? meses
+            .map((m) => {
+              const comps = (m.comprobantes || [])
+                .map(
+                  (n) => `<a class="comp" href="/api/recordatorios/${data.id}/comprobantes/${encodeURIComponent(m.mes)}/${encodeURIComponent(n)}" target="_blank" rel="noopener">📄 ${esc(n)}</a>`
+                )
+                .join("");
+              const badge = m.pagado
+                ? `<span class="chip verde">pagado ✓</span>`
+                : `<span class="chip neutro">sin marcar</span>`;
+              return `
+                <article class="card recordatorio${m.pagado ? " ok" : ""}">
+                  <div class="fila">
+                    <div class="info"><div class="h-titulo">${esc(nombreMes(m.mes))}</div></div>
+                    <div class="right">${badge}</div>
+                  </div>
+                  ${comps ? `<div class="comprobantes">${comps}</div>` : ""}
+                </article>`;
+            })
+            .join("")
+        : `<p class="vacio">Todavía no hay pagos registrados para este recordatorio.</p>`;
+
+      resultado.innerHTML =
+        `<div class="rec-toolbar"><button id="btn-volver" class="mini">← volver a recordatorios</button></div>` +
+        bloque(
+          `Historial · ${esc(data.concepto)}`,
+          `${meses.length} ${meses.length === 1 ? "mes" : "meses"}`,
+          filas
+        );
+    }
+
+    async function verHistorial(id) {
+      ultimaAccion = () => verHistorial(id);
+      errorBox.classList.remove("show");
+      resultado.innerHTML = "";
+      setCargando(true, "Cargando historial…");
+      try {
+        const resp = await fetch(`/api/recordatorios/${id}/historial`);
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok) throw new Error(`Error ${resp.status}`);
+        renderHistorial(data);
+      } catch (err) {
+        mostrarError("No pude cargar el historial.");
+      } finally {
+        setCargando(false);
       }
     }
 
@@ -1018,13 +1088,24 @@
       const delc = e.target.closest("button.borrar-comp");
       if (delc) {
         e.preventDefault();
-        borrarComprobante(delc.dataset.id, delc.dataset.nombre);
+        borrarComprobante(delc.dataset.id, delc.dataset.mes, delc.dataset.nombre);
         return;
       }
       const tp = e.target.closest("button.toggle-pago");
       if (tp) {
         e.preventDefault();
         togglePago(tp.dataset.id, tp.dataset.pagado !== "1");
+        return;
+      }
+      const vh = e.target.closest("button.ver-historial");
+      if (vh) {
+        e.preventDefault();
+        verHistorial(vh.dataset.id);
+        return;
+      }
+      if (e.target.closest("#btn-volver")) {
+        e.preventDefault();
+        cargarRecordatorios();
         return;
       }
       if (e.target.closest("#btn-exportar")) {

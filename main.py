@@ -325,20 +325,27 @@ def importar_recordatorios(items: list = Body(...)):
 @app.post("/api/recordatorios/{rid}/comprobantes")
 async def subir_comprobante(rid: int, archivo: UploadFile = File(...)):
     contenido = await archivo.read()
-    lista = comprobantes.guardar(rid, archivo.filename, contenido)
+    mes = recordatorios.mes_actual(rid)
+    lista = comprobantes.guardar(rid, mes, archivo.filename, contenido)
     # Subir el comprobante marca el recordatorio como pagado este mes.
     recordatorios.marcar_pagado(rid, True)
     return JSONResponse({"comprobantes": lista})
 
 
-@app.get("/api/recordatorios/{rid}/comprobantes/{nombre}")
-def ver_comprobante(rid: int, nombre: str):
-    ruta = comprobantes.ruta(rid, nombre)
+@app.get("/api/recordatorios/{rid}/comprobantes/{mes}/{nombre}")
+def ver_comprobante(rid: int, mes: str, nombre: str):
+    ruta = comprobantes.ruta(rid, mes, nombre)
     if not ruta:
         return JSONResponse({"error": "Comprobante no encontrado."}, status_code=404)
     return FileResponse(ruta, filename=nombre)
 
 
-@app.delete("/api/recordatorios/{rid}/comprobantes/{nombre}")
-def borrar_comprobante(rid: int, nombre: str):
-    return JSONResponse({"comprobantes": comprobantes.borrar(rid, nombre)})
+@app.delete("/api/recordatorios/{rid}/comprobantes/{mes}/{nombre}")
+def borrar_comprobante(rid: int, mes: str, nombre: str):
+    return JSONResponse({"comprobantes": comprobantes.borrar(rid, mes, nombre)})
+
+
+@app.get("/api/recordatorios/{rid}/historial")
+def historial_recordatorio(rid: int):
+    """Historial mes a mes de un recordatorio (pagos + comprobantes)."""
+    return JSONResponse(recordatorios.historial(rid))

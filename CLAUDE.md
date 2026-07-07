@@ -123,10 +123,12 @@ probar la interfaz sin gastar ni loguearse:
 - **Marcar como pagado** por mes (`POST /api/recordatorios/{id}/pagado`): chip verde "pagado ✓";
   se resetea solo el mes siguiente. Subir un comprobante marca pagado automáticamente.
 - **Backup**: Exportar / Importar (`POST /api/recordatorios/importar`).
-- **Comprobantes de pago (Drive local)**: subir/ver/borrar archivos por recordatorio.
-  - `POST /api/recordatorios/{id}/comprobantes` (multipart)
-  - `GET  /api/recordatorios/{id}/comprobantes/{nombre}` (descarga; protegido contra path traversal)
-  - `DELETE /api/recordatorios/{id}/comprobantes/{nombre}`
+- **Comprobantes de pago (Drive local)**, organizados por mes (`comprobantes/<id>/<YYYY-MM>/`):
+  - `POST /api/recordatorios/{id}/comprobantes` (multipart; guarda en el mes vigente y marca pagado)
+  - `GET  /api/recordatorios/{id}/comprobantes/{mes}/{nombre}` (descarga; protegido contra path traversal)
+  - `DELETE /api/recordatorios/{id}/comprobantes/{mes}/{nombre}`
+- **Historial de pagos** (`GET /api/recordatorios/{id}/historial`): mes a mes, qué se pagó
+  y con qué comprobante. Botón "🗂 historial" en cada recordatorio.
 
 ### Robustez
 - `parse_json_safe`: repara JSON truncado (por si la IA se corta). Si no hay nada
@@ -148,7 +150,7 @@ Ideas charladas, ordenadas por impacto. **Ninguna está hecha todavía** salvo l
       mucho, un borrador de mail listo para copiar.
 
 **Media**
-- [ ] **Historial de pagos** por recordatorio (mes a mes, con su comprobante).
+- [x] **Historial de pagos** por recordatorio (mes a mes, con su comprobante) — HECHO.
 - [ ] **Editar** un recordatorio (hoy solo se agrega/borra).
 - [ ] **Notificaciones/alertas** (mail o del navegador) cuando algo vence pronto.
 - [ ] **Categorías/etiquetas** y filtros en las tres vistas.
