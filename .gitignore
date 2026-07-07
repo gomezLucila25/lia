@@ -1,0 +1,24 @@
+# Secretos y credenciales — NUNCA commitear
+.env
+.en
+.env.local
+credentials.json
+token.json
+
+# Config local del editor / Claude Code
+.claude/
+
+# Datos personales locales
+recordatorios.json
+comprobantes/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# IDE
+.idea/
+.vscode/
