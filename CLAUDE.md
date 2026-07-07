@@ -120,6 +120,8 @@ probar la interfaz sin gastar ni loguearse:
   concepto + día del mes + monto opcional.
 - Se guardan en `recordatorios.json` (disco local; sobreviven cierre de página y apagado).
 - Chips de "vence en X días". No usan Gmail ni IA → gratis.
+- **Marcar como pagado** por mes (`POST /api/recordatorios/{id}/pagado`): chip verde "pagado ✓";
+  se resetea solo el mes siguiente. Subir un comprobante marca pagado automáticamente.
 - **Backup**: Exportar / Importar (`POST /api/recordatorios/importar`).
 - **Comprobantes de pago (Drive local)**: subir/ver/borrar archivos por recordatorio.
   - `POST /api/recordatorios/{id}/comprobantes` (multipart)
@@ -140,8 +142,8 @@ Ideas charladas, ordenadas por impacto. **Ninguna está hecha todavía** salvo l
 
 **Próximo / alto impacto**
 - [x] **Resumen arriba de todo** — HECHO (botón "Resumen", `/api/resumen`).
-- [ ] **Marcar recordatorio como "pagado este mes"** (y que el chip cambie a verde),
-      idealmente al subir el comprobante.
+- [x] **Marcar recordatorio como "pagado este mes"** — HECHO (chip verde; se marca solo
+      al subir el comprobante; se resetea al mes siguiente).
 - [ ] **Follow-up sugerido** en búsqueda laboral: para postulaciones sin respuesta hace
       mucho, un borrador de mail listo para copiar.
 

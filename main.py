@@ -126,7 +126,7 @@ def _merge_recordatorios(resultado):
             "emisor": "Recordatorio fijo",
             "fecha": r.get("proxima"),
             "detalle": detalle,
-            "estado": "pendiente",
+            "estado": "pagado" if r.get("pagado") else "pendiente",
             "origen": "recordatorio",
         })
     resultado["vencimientos"] = list(resultado.get("vencimientos") or []) + extra
@@ -215,6 +215,8 @@ def _armar_resumen(triage, jobs, recs, hoy):
             "origen": "mail",
         })
     for r in recs:
+        if r.get("pagado"):
+            continue  # ya está pagado este mes, no lo mostramos como pendiente
         venc.append({
             "titulo": r.get("concepto"),
             "fecha": r.get("proxima"),
@@ -299,6 +301,16 @@ def del_recordatorio(rid: int):
     return JSONResponse({"recordatorios": recordatorios.borrar(rid)})
 
 
+class PagadoIn(BaseModel):
+    pagado: bool = True
+
+
+@app.post("/api/recordatorios/{rid}/pagado")
+def marcar_pagado_endpoint(rid: int, body: PagadoIn):
+    """Marca/desmarca un recordatorio como pagado este mes."""
+    return JSONResponse({"recordatorios": recordatorios.marcar_pagado(rid, body.pagado)})
+
+
 @app.post("/api/recordatorios/importar")
 def importar_recordatorios(items: list = Body(...)):
     """Restaura recordatorios desde un archivo exportado (backup)."""
@@ -314,6 +326,8 @@ def importar_recordatorios(items: list = Body(...)):
 async def subir_comprobante(rid: int, archivo: UploadFile = File(...)):
     contenido = await archivo.read()
     lista = comprobantes.guardar(rid, archivo.filename, contenido)
+    # Subir el comprobante marca el recordatorio como pagado este mes.
+    recordatorios.marcar_pagado(rid, True)
     return JSONResponse({"comprobantes": lista})
 
 

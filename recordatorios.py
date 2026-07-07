@@ -64,10 +64,35 @@ def listar(hoy=None):
     cercana."""
     items = _leer()
     for it in items:
-        it["proxima"] = proxima_fecha(it.get("dia", 1), hoy)
+        prox = proxima_fecha(it.get("dia", 1), hoy)
+        it["proxima"] = prox
+        # Pagado si el mes de la próxima fecha (YYYY-MM) está en la lista de pagos.
+        it["pagado"] = prox[:7] in (it.get("pagos") or [])
         it["comprobantes"] = comprobantes.listar(it.get("id", 0))
     items.sort(key=lambda it: it["proxima"])
     return items
+
+
+def marcar_pagado(rid, pagado=True, hoy=None):
+    """Marca (o desmarca) un recordatorio como pagado para el mes de su próxima
+    fecha. Al mes siguiente vuelve a aparecer como pendiente automáticamente."""
+    try:
+        rid = int(rid)
+    except (TypeError, ValueError):
+        return listar(hoy)
+    items = _leer()
+    for it in items:
+        if it.get("id") == rid:
+            mes = proxima_fecha(it.get("dia", 1), hoy)[:7]
+            pagos = set(it.get("pagos") or [])
+            if pagado:
+                pagos.add(mes)
+            else:
+                pagos.discard(mes)
+            it["pagos"] = sorted(pagos)
+            break
+    _guardar(items)
+    return listar(hoy)
 
 
 def importar(items):

@@ -413,6 +413,20 @@
     }
     button.borrar:hover { background: var(--rojo-bg); color: var(--rojo); }
 
+    button.toggle-pago {
+      border: 1px solid var(--line);
+      background: transparent;
+      color: var(--ink-soft);
+      cursor: pointer;
+      font-family: inherit;
+      font-size: .74rem;
+      padding: 5px 10px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+    button.toggle-pago:hover { border-color: var(--verde); color: var(--verde); }
+    .card.recordatorio.ok { border-color: var(--verde-bg); background: linear-gradient(0deg, var(--verde-bg) 0%, var(--card) 60%); }
+
     /* Ruido colapsable */
     details.ruido {
       margin-top: 44px;
@@ -762,8 +776,9 @@
     }
 
     // ---------- Recordatorios fijos ----------
-    function chipRecordatorio(proxima) {
-      const d = diasRestantes(proxima);
+    function chipRecordatorio(r) {
+      if (r.pagado) return { texto: "pagado ✓", clase: "verde" };
+      const d = diasRestantes(r.proxima);
       if (d === null) return { texto: "—", clase: "neutro" };
       if (d === 0) return { texto: "vence HOY", clase: "rojo" };
       if (d === 1) return { texto: "vence MAÑANA", clase: "rojo" };
@@ -791,10 +806,13 @@
     }
 
     function cardRecordatorio(r) {
-      const chip = chipRecordatorio(r.proxima);
+      const chip = chipRecordatorio(r);
       const monto = r.monto ? ` · ${esc(r.monto)}` : "";
+      const toggle = r.pagado
+        ? `<button class="toggle-pago" data-id="${esc(r.id)}" data-pagado="1" title="Deshacer">↩ deshacer</button>`
+        : `<button class="toggle-pago" data-id="${esc(r.id)}" data-pagado="0" title="Marcar como pagado">✓ pagué</button>`;
       return `
-        <article class="card recordatorio">
+        <article class="card recordatorio${r.pagado ? " ok" : ""}">
           <div class="fila">
             <div class="info">
               <div class="h-titulo">${esc(r.concepto)}</div>
@@ -802,6 +820,7 @@
             </div>
             <div class="right">
               <span class="chip ${chip.clase}">${esc(chip.texto)}</span>
+              ${toggle}
               <button class="borrar" data-id="${esc(r.id)}" title="Borrar" aria-label="Borrar">✕</button>
             </div>
           </div>
@@ -897,6 +916,22 @@
       }
     }
 
+    async function togglePago(id, pagado) {
+      errorBox.classList.remove("show");
+      try {
+        const resp = await fetch(`/api/recordatorios/${id}/pagado`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pagado }),
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok) throw new Error(`Error ${resp.status}`);
+        renderRecordatorios(data);
+      } catch (err) {
+        mostrarError("No pude actualizar el pago.");
+      }
+    }
+
     async function exportarRecordatorios() {
       try {
         const resp = await fetch("/api/recordatorios");
@@ -984,6 +1019,12 @@
       if (delc) {
         e.preventDefault();
         borrarComprobante(delc.dataset.id, delc.dataset.nombre);
+        return;
+      }
+      const tp = e.target.closest("button.toggle-pago");
+      if (tp) {
+        e.preventDefault();
+        togglePago(tp.dataset.id, tp.dataset.pagado !== "1");
         return;
       }
       if (e.target.closest("#btn-exportar")) {
