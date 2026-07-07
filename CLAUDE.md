@@ -111,9 +111,11 @@ probar la interfaz sin gastar ni loguearse:
 - Busca mails de laburo (español/inglés) de los últimos 60 días.
 - Arma el seguimiento de **postulaciones** con estado: postulada / te respondieron /
   entrevista agendada / rechazada / oferta / sin respuesta.
-- Vistas: Próximas entrevistas, Te falta completar (pendientes), Postulaciones activas,
-  y "Te dijeron que no" (rechazos, colapsado).
+- Vistas: Próximas entrevistas, Te falta completar (pendientes), Para hacer follow-up
+  (sin respuesta), Postulaciones activas, y "Te dijeron que no" (rechazos, colapsado).
 - Tarjetas clickeables al mail.
+- **Follow-up** (`POST /api/followup`): para postulaciones sin respuesta, la IA redacta
+  un borrador de mail de seguimiento (asunto + cuerpo), editable, con botón "copiar".
 
 ### 3. Recordatorios fijos  ·  `GET/POST /api/recordatorios`, `DELETE /api/recordatorios/{id}`
 - Gastos recurrentes cargados a mano (alquiler, agua, luz, gas, ADT, expensas, etc.):
@@ -146,8 +148,7 @@ Ideas charladas, ordenadas por impacto. **Ninguna está hecha todavía** salvo l
 - [x] **Resumen arriba de todo** — HECHO (botón "Resumen", `/api/resumen`).
 - [x] **Marcar recordatorio como "pagado este mes"** — HECHO (chip verde; se marca solo
       al subir el comprobante; se resetea al mes siguiente).
-- [ ] **Follow-up sugerido** en búsqueda laboral: para postulaciones sin respuesta hace
-      mucho, un borrador de mail listo para copiar.
+- [x] **Follow-up sugerido** en búsqueda laboral — HECHO (borrador de mail editable + copiar).
 
 **Media**
 - [x] **Historial de pagos** por recordatorio (mes a mes, con su comprobante) — HECHO.

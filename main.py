@@ -251,6 +251,40 @@ def _armar_resumen(triage, jobs, recs, hoy):
     }
 
 
+class FollowupIn(BaseModel):
+    empresa: str = ""
+    puesto: str = ""
+    detalle: str = ""
+
+
+DEMO_FOLLOWUP = {
+    "asunto": "Seguimiento — Content Designer",
+    "cuerpo": (
+        "Hola,\n\nTe escribo para retomar mi postulación al puesto de Content "
+        "Designer. Sigo muy interesada en la posición y me encantaría saber si el "
+        "proceso continúa o si necesitan algo más de mi parte.\n\n"
+        "¡Gracias y quedo atenta!\n\nSaludos,\n[Tu nombre]"
+    ),
+}
+
+
+@app.post("/api/followup")
+def followup(post: FollowupIn):
+    """Genera un borrador de mail de seguimiento para una postulación sin respuesta."""
+    try:
+        if _modo_demo():
+            return JSONResponse(DEMO_FOLLOWUP)
+        return JSONResponse(_backend().redactar_followup(post.model_dump()))
+    except (ClaudeConfigError, GeminiConfigError) as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+    except RespuestaIncompletaError:
+        return JSONResponse({"error": "La respuesta vino incompleta, reintentá."}, status_code=502)
+    except Exception as e:
+        return JSONResponse(
+            {"error": f"Algo salió mal, reintentá. ({type(e).__name__})"}, status_code=500
+        )
+
+
 @app.post("/api/resumen")
 def resumen():
     """Pantallazo combinado: vencimientos (correo + recordatorios) + búsqueda laboral."""

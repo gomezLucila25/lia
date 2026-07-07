@@ -145,6 +145,42 @@ Mails:
 """
 
 
+# ------------------------- Follow-up de postulaciones -------------------------
+
+SCHEMA_FOLLOWUP = '{"asunto": str, "cuerpo": str}'
+
+SYSTEM_PROMPT_FOLLOWUP = (
+    "Sos LIA y ayudás a una persona en Argentina con su búsqueda laboral. "
+    "Escribís un mail de seguimiento (follow-up) breve y profesional en "
+    "castellano rioplatense. Respondés ÚNICAMENTE con JSON válido, sin fences."
+)
+
+
+def _armar_prompt_followup(post):
+    return f"""Escribí un mail de follow-up para una postulación que quedó SIN RESPUESTA.
+Empresa: {post.get('empresa', '')}
+Puesto: {post.get('puesto', '')}
+Contexto: {post.get('detalle', '')}
+
+Devolvé SOLO este JSON:
+{SCHEMA_FOLLOWUP}
+
+Reglas:
+- Tono profesional pero cercano, castellano rioplatense. Cuerpo breve (máx ~90 palabras).
+- Reiterá interés en el puesto y pedí novedades del proceso, sin sonar ansioso ni reclamar.
+- No inventes datos (nombres, fechas puntuales) que no estén en el contexto.
+- Cerrá con "Saludos," y en la línea siguiente "[Tu nombre]" como placeholder.
+- "asunto": corto y claro.
+"""
+
+
+def redactar_followup(post):
+    """Genera un borrador {asunto, cuerpo} de mail de seguimiento con Claude."""
+    return parse_json_safe(
+        _completar(SYSTEM_PROMPT_FOLLOWUP, _armar_prompt_followup(post))
+    )
+
+
 def _completar(system, prompt):
     """Llama a Claude una vez y devuelve el texto de la respuesta."""
     api_key = os.getenv("ANTHROPIC_API_KEY")

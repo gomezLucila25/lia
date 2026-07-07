@@ -23,8 +23,10 @@ from parser import parse_json_safe
 from claude_client import (
     SYSTEM_PROMPT,
     SYSTEM_PROMPT_BUSQUEDA,
+    SYSTEM_PROMPT_FOLLOWUP,
     _armar_prompt,
     _armar_prompt_busqueda,
+    _armar_prompt_followup,
 )
 
 load_dotenv()
@@ -69,4 +71,11 @@ def analizar_busqueda_laboral(mails):
     """Seguimiento de postulaciones. Devuelve el dict del schema de búsqueda."""
     return parse_json_safe(
         _completar(SYSTEM_PROMPT_BUSQUEDA, _armar_prompt_busqueda(mails))
+    )
+
+
+def redactar_followup(post):
+    """Genera un borrador {asunto, cuerpo} de mail de seguimiento con Gemini."""
+    return parse_json_safe(
+        _completar(SYSTEM_PROMPT_FOLLOWUP, _armar_prompt_followup(post))
     )

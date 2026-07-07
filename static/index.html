@@ -399,6 +399,64 @@
     }
     button.ver-historial:hover { color: var(--brand); text-decoration: underline; }
 
+    /* Follow-up */
+    .card.followup { display: flex; flex-direction: column; align-items: stretch; gap: 10px; }
+    .card.followup .fila {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    button.gen-followup {
+      appearance: none;
+      border: 1.5px solid var(--brand);
+      background: transparent;
+      color: var(--brand);
+      font-family: inherit;
+      font-size: .82rem;
+      font-weight: 600;
+      padding: 8px 14px;
+      border-radius: 999px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    button.gen-followup:hover { background: var(--brand); color: #f3f0e7; }
+    .draft-box {
+      border-top: 1px dashed var(--line);
+      padding-top: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .draft-asunto { font-size: .9rem; }
+    textarea.draft-cuerpo {
+      width: 100%;
+      font-family: "IBM Plex Sans", sans-serif;
+      font-size: .92rem;
+      line-height: 1.5;
+      color: var(--ink);
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 12px 14px;
+      resize: vertical;
+    }
+    textarea.draft-cuerpo:focus { outline: 2px solid var(--brand); border-color: transparent; }
+    button.copiar-draft {
+      align-self: flex-start;
+      appearance: none;
+      border: none;
+      background: var(--brand);
+      color: #f3f0e7;
+      font-family: inherit;
+      font-size: .85rem;
+      font-weight: 600;
+      padding: 8px 18px;
+      border-radius: 999px;
+      cursor: pointer;
+    }
+    button.copiar-draft:hover { background: var(--brand-ink); }
+
     .rec-toolbar { display: flex; gap: 8px; margin-bottom: 16px; }
     button.mini {
       appearance: none;
@@ -743,12 +801,27 @@
         </a>`;
     }
 
+    function cardFollowup(p) {
+      return `
+        <article class="card followup" data-empresa="${esc(p.empresa)}" data-puesto="${esc(p.puesto)}" data-detalle="${esc(p.detalle)}">
+          <div class="fila">
+            <div class="info">
+              <div class="h-titulo">${esc(p.puesto)} — ${esc(p.empresa)}</div>
+              <div class="emisor">${esc(p.detalle)}</div>
+            </div>
+            <button class="gen-followup">✍️ generar follow-up</button>
+          </div>
+          <div class="draft"></div>
+        </article>`;
+    }
+
     function renderBusqueda(data) {
       setFuentes(data);
       const posts = data.postulaciones || [];
       const activas = posts.filter((p) => p.estado !== "rechazada");
       const rechazos = posts.filter((p) => p.estado === "rechazada");
       const pendientes = posts.filter((p) => (p.pendiente || "").trim());
+      const sinResp = posts.filter((p) => p.estado === "sin_respuesta");
       const entrevistas = posts
         .filter((p) => p.proxima_fecha || p.estado === "entrevista_agendada")
         .sort((a, b) => {
@@ -779,9 +852,14 @@
           }
         </details>`;
 
+      const followupHtml = sinResp.length
+        ? sinResp.map(cardFollowup).join("")
+        : `<p class="vacio">Ninguna postulación quedó sin respuesta. 🙌</p>`;
+
       resultado.innerHTML =
         bloque("Próximas entrevistas", `${entrevistas.length} · lo más cercano primero`, entrevistasHtml) +
         bloque("Te falta completar", `${pendientes.length}`, pendientesHtml) +
+        bloque("Para hacer follow-up", `${sinResp.length} · sin respuesta`, followupHtml) +
         bloque("Postulaciones activas", `${activas.length}`, activasHtml) +
         rechazosHtml;
     }
@@ -1077,8 +1155,59 @@
       }
     }
 
+    async function generarFollowup(cardEl) {
+      const draft = cardEl.querySelector(".draft");
+      draft.innerHTML = `<p class="vacio">Escribiendo el borrador…</p>`;
+      try {
+        const resp = await fetch("/api/followup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            empresa: cardEl.dataset.empresa,
+            puesto: cardEl.dataset.puesto,
+            detalle: cardEl.dataset.detalle,
+          }),
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || data.error) throw new Error(data.error || `Error ${resp.status}`);
+        draft.innerHTML = `
+          <div class="draft-box">
+            <div class="draft-asunto"><strong>Asunto:</strong> ${esc(data.asunto)}</div>
+            <textarea class="draft-cuerpo" rows="9">${esc(data.cuerpo)}</textarea>
+            <button class="copiar-draft" data-asunto="${esc(data.asunto)}">📋 copiar mail</button>
+          </div>`;
+      } catch (err) {
+        draft.innerHTML = `<p class="vacio">No pude generar el borrador: ${esc(err.message)}</p>`;
+      }
+    }
+
+    function copiarDraft(btn) {
+      const box = btn.closest(".draft-box");
+      const asunto = btn.dataset.asunto || "";
+      const cuerpo = box.querySelector(".draft-cuerpo").value;
+      navigator.clipboard
+        .writeText(`Asunto: ${asunto}\n\n${cuerpo}`)
+        .then(() => {
+          btn.textContent = "✓ copiado";
+          setTimeout(() => (btn.textContent = "📋 copiar mail"), 1500);
+        })
+        .catch(() => mostrarError("No pude copiar (permiso del navegador)."));
+    }
+
     // Listeners delegados (las tarjetas se re-dibujan, por eso van en el contenedor).
     resultado.addEventListener("click", (e) => {
+      const gf = e.target.closest("button.gen-followup");
+      if (gf) {
+        e.preventDefault();
+        generarFollowup(gf.closest(".card.followup"));
+        return;
+      }
+      const cd = e.target.closest("button.copiar-draft");
+      if (cd) {
+        e.preventDefault();
+        copiarDraft(cd);
+        return;
+      }
       const del = e.target.closest("button.borrar");
       if (del) {
         e.preventDefault();
