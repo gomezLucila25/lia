@@ -116,6 +116,9 @@ probar la interfaz sin gastar ni loguearse:
 - Tarjetas clickeables al mail.
 - **Follow-up** (`POST /api/followup`): para postulaciones sin respuesta, la IA redacta
   un borrador de mail de seguimiento (asunto + cuerpo), editable, con botón "copiar".
+- **Postulaciones a mano** (`GET/POST /api/postulaciones`, `PUT/DELETE .../{id}`): sección
+  "Mis postulaciones (a mano)" para las que la IA no detecta; agregar/editar/borrar,
+  guardadas en `postulaciones.json`. Se muestran aparte de las detectadas por la IA.
 
 ### 3. Recordatorios fijos  ·  `GET/POST /api/recordatorios`, `DELETE /api/recordatorios/{id}`
 - Gastos recurrentes cargados a mano (alquiler, agua, luz, gas, ADT, expensas, etc.):
@@ -166,7 +169,7 @@ Ideas charladas, ordenadas por impacto. **Ninguna está hecha todavía** salvo l
 - [x] **Notificaciones/alertas** cuando algo vence pronto — HECHO (banner + notificación
       de escritorio, basado en recordatorios). Futuro: extenderlo a vencimientos del correo.
 - [ ] **Categorías/etiquetas** y filtros en las tres vistas.
-- [ ] **Agregar postulaciones a mano** (por si la IA no detecta alguna).
+- [x] **Agregar postulaciones a mano** — HECHO (sección "Mis postulaciones", CRUD completo).
 
 **Futuro / nice-to-have**
 - [ ] Soporte multi-cuenta de Gmail.

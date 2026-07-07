@@ -22,9 +22,11 @@ import claude_client
 import gemini_client
 import recordatorios
 import comprobantes
+import postulaciones
 from claude_client import ClaudeConfigError
 from gemini_client import GeminiConfigError
 from recordatorios import RecordatorioInvalido
+from postulaciones import PostulacionInvalida
 
 app = FastAPI(title="LIA Mail Triage")
 
@@ -177,12 +179,50 @@ def analizar():
     )
 
 
+def _merge_postulaciones(resultado):
+    """Suma las postulaciones cargadas a mano, en una clave aparte 'manual'."""
+    resultado["manual"] = postulaciones.listar()
+
+
 @app.post("/api/busqueda")
 def busqueda():
-    """Seguimiento de la búsqueda laboral (postulaciones)."""
+    """Seguimiento de la búsqueda laboral (postulaciones del correo + manuales)."""
     return _responder(
-        obtener_mails_busqueda, _backend().analizar_busqueda_laboral, DEMO_BUSQUEDA
+        obtener_mails_busqueda,
+        _backend().analizar_busqueda_laboral,
+        DEMO_BUSQUEDA,
+        post=_merge_postulaciones,
     )
+
+
+class PostulacionIn(BaseModel):
+    empresa: str = ""
+    puesto: str = ""
+    estado: str = "postulada"
+    proxima_fecha: str = ""
+    pendiente: str = ""
+    detalle: str = ""
+
+
+@app.post("/api/postulaciones")
+def add_postulacion(p: PostulacionIn):
+    try:
+        return JSONResponse({"postulaciones": postulaciones.agregar(**p.model_dump())})
+    except PostulacionInvalida as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+
+@app.put("/api/postulaciones/{pid}")
+def edit_postulacion(pid: int, p: PostulacionIn):
+    try:
+        return JSONResponse({"postulaciones": postulaciones.editar(pid, **p.model_dump())})
+    except PostulacionInvalida as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+
+@app.delete("/api/postulaciones/{pid}")
+def del_postulacion(pid: int):
+    return JSONResponse({"postulaciones": postulaciones.borrar(pid)})
 
 
 # ---------------- Resumen (pantallazo de todo junto) ----------------

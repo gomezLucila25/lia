@@ -365,7 +365,18 @@
       background: var(--card);
       color: var(--ink);
     }
-    .form-rec input:focus { outline: 2px solid var(--brand); border-color: transparent; }
+    .form-rec select {
+      font-family: inherit;
+      font-size: .95rem;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--card);
+      color: var(--ink);
+      cursor: pointer;
+    }
+    .form-rec input[type="date"] { width: auto; }
+    .form-rec input:focus, .form-rec select:focus { outline: 2px solid var(--brand); border-color: transparent; }
     .form-rec .concepto { flex: 1; min-width: 160px; }
     .form-rec .dia { width: 90px; }
     .form-rec .monto { width: 150px; }
@@ -838,6 +849,144 @@
         </a>`;
     }
 
+    let ultimaBusqueda = null;
+    let editandoPostId = null;
+
+    const ESTADOS_POST = [
+      ["postulada", "Postulada"],
+      ["respondieron", "Me respondieron"],
+      ["entrevista_agendada", "Entrevista agendada"],
+      ["oferta", "Oferta"],
+      ["sin_respuesta", "Sin respuesta"],
+      ["rechazada", "Rechazada"],
+    ];
+
+    function estadoSelectHtml(sel) {
+      return (
+        `<select class="estado-sel" name="estado">` +
+        ESTADOS_POST.map(
+          ([v, l]) => `<option value="${v}"${v === sel ? " selected" : ""}>${l}</option>`
+        ).join("") +
+        `</select>`
+      );
+    }
+
+    function formPostHtml() {
+      return `
+        <form id="form-post" class="form-rec">
+          <input class="concepto" name="empresa" placeholder="Empresa" />
+          <input class="concepto" name="puesto" placeholder="Puesto" />
+          ${estadoSelectHtml("postulada")}
+          <input type="date" name="proxima_fecha" title="Fecha de entrevista (opcional)" />
+          <input class="monto" name="detalle" placeholder="Nota (opcional)" />
+          <button type="submit" class="cta">Agregar</button>
+        </form>`;
+    }
+
+    function cardManual(p) {
+      const chip = chipEstado(p);
+      const sub = [
+        p.detalle,
+        p.pendiente ? "pendiente: " + p.pendiente : "",
+        p.proxima_fecha ? "entrevista " + cuandoTexto(p.proxima_fecha) : "",
+      ]
+        .filter(Boolean)
+        .join(" · ");
+      return `
+        <article class="card recordatorio">
+          <div class="fila">
+            <div class="info">
+              <div class="h-titulo">${esc(p.puesto || "(sin puesto)")} — ${esc(p.empresa || "(sin empresa)")}</div>
+              <div class="emisor">${esc(sub)}</div>
+            </div>
+            <div class="right">
+              <span class="chip ${chip.clase}">${esc(chip.texto)}</span>
+              <button class="editar-post" data-id="${esc(p.id)}" title="Editar" aria-label="Editar">✏️</button>
+              <button class="borrar-post" data-id="${esc(p.id)}" title="Borrar" aria-label="Borrar">✕</button>
+            </div>
+          </div>
+        </article>`;
+    }
+
+    function cardEditarPost(p) {
+      return `
+        <article class="card recordatorio">
+          <form class="form-rec" data-editpost="1" data-id="${esc(p.id)}">
+            <input class="concepto" name="empresa" value="${esc(p.empresa)}" placeholder="Empresa" />
+            <input class="concepto" name="puesto" value="${esc(p.puesto)}" placeholder="Puesto" />
+            ${estadoSelectHtml(p.estado)}
+            <input type="date" name="proxima_fecha" value="${esc(p.proxima_fecha || "")}" />
+            <input class="monto" name="pendiente" value="${esc(p.pendiente || "")}" placeholder="Pendiente" />
+            <input class="concepto" name="detalle" value="${esc(p.detalle || "")}" placeholder="Nota" />
+            <button type="submit" class="cta">Guardar</button>
+            <button type="button" class="mini cancelar-post-edit">Cancelar</button>
+          </form>
+        </article>`;
+    }
+
+    async function crudPost(url, method, body) {
+      errorBox.classList.remove("show");
+      const resp = await fetch(url, {
+        method,
+        headers: body ? { "Content-Type": "application/json" } : undefined,
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || data.error) throw new Error(data.error || `Error ${resp.status}`);
+      return data.postulaciones || [];
+    }
+
+    function aplicarManual(lista) {
+      if (!ultimaBusqueda) ultimaBusqueda = { postulaciones: [], manual: [] };
+      ultimaBusqueda.manual = lista;
+      renderBusqueda(ultimaBusqueda);
+    }
+
+    async function onAgregarPost(e) {
+      e.preventDefault();
+      const f = e.target;
+      try {
+        aplicarManual(
+          await crudPost("/api/postulaciones", "POST", {
+            empresa: f.empresa.value.trim(),
+            puesto: f.puesto.value.trim(),
+            estado: f.estado.value,
+            proxima_fecha: f.proxima_fecha.value,
+            detalle: f.detalle.value.trim(),
+          })
+        );
+      } catch (err) {
+        mostrarError(err.message || "No pude agregar la postulación.");
+      }
+    }
+
+    async function onEditarPost(e) {
+      e.preventDefault();
+      const f = e.target;
+      try {
+        const lista = await crudPost(`/api/postulaciones/${f.dataset.id}`, "PUT", {
+          empresa: f.empresa.value.trim(),
+          puesto: f.puesto.value.trim(),
+          estado: f.estado.value,
+          proxima_fecha: f.proxima_fecha.value,
+          pendiente: f.pendiente.value.trim(),
+          detalle: f.detalle.value.trim(),
+        });
+        editandoPostId = null;
+        aplicarManual(lista);
+      } catch (err) {
+        mostrarError(err.message || "No pude guardar los cambios.");
+      }
+    }
+
+    async function borrarPost(id) {
+      try {
+        aplicarManual(await crudPost(`/api/postulaciones/${id}`, "DELETE", null));
+      } catch (err) {
+        mostrarError(err.message || "No pude borrar la postulación.");
+      }
+    }
+
     function cardFollowup(p) {
       return `
         <article class="card followup" data-empresa="${esc(p.empresa)}" data-puesto="${esc(p.puesto)}" data-detalle="${esc(p.detalle)}">
@@ -853,6 +1002,7 @@
     }
 
     function renderBusqueda(data) {
+      ultimaBusqueda = data;
       setFuentes(data);
       const posts = data.postulaciones || [];
       const activas = posts.filter((p) => p.estado !== "rechazada");
@@ -893,12 +1043,28 @@
         ? sinResp.map(cardFollowup).join("")
         : `<p class="vacio">Ninguna postulación quedó sin respuesta. 🙌</p>`;
 
+      const manuales = data.manual || [];
+      const manualHtml =
+        formPostHtml() +
+        (manuales.length
+          ? manuales
+              .map((p) => (p.id === editandoPostId ? cardEditarPost(p) : cardManual(p)))
+              .join("")
+          : `<p class="vacio">Agregá arriba las que la IA no detectó.</p>`);
+
       resultado.innerHTML =
         bloque("Próximas entrevistas", `${entrevistas.length} · lo más cercano primero`, entrevistasHtml) +
         bloque("Te falta completar", `${pendientes.length}`, pendientesHtml) +
         bloque("Para hacer follow-up", `${sinResp.length} · sin respuesta`, followupHtml) +
         bloque("Postulaciones activas", `${activas.length}`, activasHtml) +
+        bloque("Mis postulaciones (a mano)", `${manuales.length}`, manualHtml) +
         rechazosHtml;
+
+      const fp = document.getElementById("form-post");
+      if (fp) fp.addEventListener("submit", onAgregarPost);
+      resultado
+        .querySelectorAll("form[data-editpost]")
+        .forEach((f) => f.addEventListener("submit", onEditarPost));
     }
 
     // ---------- Avisos de vencimiento (notificaciones) ----------
@@ -1366,6 +1532,26 @@
         e.preventDefault();
         editandoId = null;
         renderRecordatorios(ultimosRecordatorios);
+        return;
+      }
+      const ep = e.target.closest("button.editar-post");
+      if (ep) {
+        e.preventDefault();
+        editandoPostId = Number(ep.dataset.id);
+        renderBusqueda(ultimaBusqueda);
+        return;
+      }
+      const bp = e.target.closest("button.borrar-post");
+      if (bp) {
+        e.preventDefault();
+        borrarPost(bp.dataset.id);
+        return;
+      }
+      const cpe = e.target.closest("button.cancelar-post-edit");
+      if (cpe) {
+        e.preventDefault();
+        editandoPostId = null;
+        renderBusqueda(ultimaBusqueda);
         return;
       }
       const delc = e.target.closest("button.borrar-comp");
